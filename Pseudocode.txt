@@ -1,0 +1,134 @@
+FloodWatch SL - Pseudocode (PROG101 Assignment 1)
+
+// ===== CONSTANTS =====
+CONSTANT RAIN_MODERATE = 50   // mm in 24 hours
+CONSTANT RAIN_HEAVY = 100
+CONSTANT LEVEL_ELEVATED = 70   // % of capacity
+CONSTANT LEVEL_CRITICAL = 90
+CONSTANT MAX_RAIN = 500
+CONSTANT MAX_LEVEL = 150
+
+// ===== MODULE 1: MAIN PROGRAM =====
+FUNCTION main()
+    SET totalCount = 0
+    SET riskCounts = [0, 0, 0, 0]   // LOW, MODERATE, HIGH, SEVERE
+    DISPLAY "FloodWatch SL - Community Flood Early-Warning"
+    SET communityName = getCommunityName()
+    WHILE communityName != "DONE" DO
+        SET rainfall = getValidatedNumber("Rainfall in last 24 hours (mm)", 0, MAX_RAIN)
+        SET waterLevel = getValidatedNumber("Water level (% of capacity)", 0, MAX_LEVEL)
+        SET isFloodProne = getFloodProneStatus()
+        SET baseScore = calculateRiskScore(rainfall, waterLevel)
+        SET finalScore = applyHistoryAdjustment(baseScore, isFloodProne)
+        SET riskLabel = getRiskLabel(finalScore)
+        SET message = buildAlertMessage(communityName, finalScore)
+        DISPLAY "RISK LEVEL: ", riskLabel
+        DISPLAY message
+        CALL saveRecord(communityName, rainfall, waterLevel, riskLabel)
+        SET riskCounts[finalScore] = riskCounts[finalScore] + 1
+        SET totalCount = totalCount + 1
+        SET communityName = getCommunityName()
+    END WHILE
+    CALL displaySummary(riskCounts, totalCount)
+END FUNCTION
+
+// ===== MODULE 2: INPUT AND VALIDATION =====
+FUNCTION getCommunityName()
+    REPEAT
+        DISPLAY "Enter community name (or DONE to finish): "
+        READ name
+        SET name = TRIM(name)
+        IF name = "" THEN DISPLAY "Error: name cannot be empty."
+    UNTIL name != ""
+    IF UPPERCASE(name) = "DONE" THEN RETURN "DONE"
+    RETURN name
+END FUNCTION
+
+FUNCTION getValidatedNumber(promptText, minValue, maxValue)
+    REPEAT
+        DISPLAY promptText
+        READ value
+        IF value is NOT a number THEN
+            DISPLAY "Error: please enter numbers only."
+            SET isValid = FALSE
+        ELSE IF value < minValue OR value > maxValue THEN
+            DISPLAY "Error: value must be between ", minValue, " and ", maxValue
+            SET isValid = FALSE
+        ELSE
+            SET isValid = TRUE
+        END IF
+    UNTIL isValid = TRUE
+    RETURN value
+END FUNCTION
+
+FUNCTION getFloodProneStatus()
+    REPEAT
+        DISPLAY "Is this a flood-prone area? (Y/N): "
+        READ answer
+        SET answer = UPPERCASE(TRIM(answer))
+        IF answer != "Y" AND answer != "N" THEN DISPLAY "Error: enter Y or N."
+    UNTIL answer = "Y" OR answer = "N"
+    RETURN (answer = "Y")   // Boolean value
+END FUNCTION
+
+// ===== MODULE 3: RISK CALCULATION =====
+FUNCTION calculateRiskScore(rainfall, waterLevel)
+    IF rainfall >= RAIN_HEAVY AND waterLevel >= LEVEL_CRITICAL THEN
+        RETURN 3   // SEVERE
+    ELSE IF rainfall >= RAIN_HEAVY OR waterLevel >= LEVEL_CRITICAL THEN
+        RETURN 2   // HIGH
+    ELSE IF rainfall >= RAIN_MODERATE OR waterLevel >= LEVEL_ELEVATED THEN
+        RETURN 1   // MODERATE
+    ELSE
+        RETURN 0   // LOW
+    END IF
+END FUNCTION
+
+FUNCTION applyHistoryAdjustment(score, isFloodProne)
+    IF isFloodProne = TRUE AND score < 3 THEN
+        RETURN score + 1
+    END IF
+    RETURN score
+END FUNCTION
+
+// ===== MODULE 4: OUTPUT MESSAGES =====
+FUNCTION getRiskLabel(score)
+    IF score = 0 THEN RETURN "LOW (GREEN)"
+    ELSE IF score = 1 THEN RETURN "MODERATE (YELLOW)"
+    ELSE IF score = 2 THEN RETURN "HIGH (ORANGE)"
+    ELSE RETURN "SEVERE (RED)"
+    END IF
+END FUNCTION
+
+FUNCTION buildAlertMessage(name, score)
+    IF score = 0 THEN
+        SET advice = "Normal conditions. Continue routine monitoring."
+    ELSE IF score = 1 THEN
+        SET advice = "Stay alert. Clear blocked drains and keep watching water levels."
+    ELSE IF score = 2 THEN
+        SET advice = "Prepare now. Move valuables and vulnerable people to higher ground."
+    ELSE
+        SET advice = "Evacuate low-lying areas immediately and contact the local disaster office."
+    END IF
+    RETURN "ALERT for " + name + ": " + advice
+END FUNCTION
+
+// ===== MODULE 5: RECORDS AND SUMMARY =====
+FUNCTION saveRecord(name, rainfall, waterLevel, label)
+    SET timestamp = CURRENT_DATE_TIME()
+    APPEND timestamp, name, rainfall, waterLevel, label TO file "flood_records.csv"
+END FUNCTION
+
+FUNCTION displaySummary(riskCounts, totalCount)
+    IF totalCount = 0 THEN
+        DISPLAY "No communities were assessed."
+    ELSE
+        DISPLAY "SUMMARY: ", totalCount, " communities assessed"
+        FOR i FROM 0 TO 3 DO
+            DISPLAY getRiskLabel(i), ": ", riskCounts[i]
+        END FOR
+        IF riskCounts[3] > 0 THEN
+            DISPLAY "PRIORITY: notify authorities about SEVERE-risk communities."
+        END IF
+    END IF
+END FUNCTION
